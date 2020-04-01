@@ -24,7 +24,6 @@ class BaseModel(PydanticBaseModel):
         use_enum_values = True
         allow_mutation = False
         # TODO: auto CamelCase?
-        # also... remember to use `model.dict(by_alias=True)`
 
 
 class Contact(BaseModel):
@@ -77,7 +76,10 @@ class XMLObj(BaseModel):
     wrapped: bool = False  # takes effect only when defined alongside type being array (outside the items)
 
 
-SchemaOrRef = Union["Schema", "Reference"]
+# `Reference` must come first!
+# (pydantic tries to instantiate members of Union type from L-R
+# and takes the first oen that succeeds)
+SchemaOrRef = Union["Reference", "Schema"]
 
 
 class Schema(BaseModel):
@@ -182,7 +184,7 @@ class Example(BaseModel):
 
 class Encoding(BaseModel):
     contentType: Optional[str]
-    headers: Optional[Dict[str, Union['Header', Reference]]]
+    headers: Optional[Dict[str, Union[Reference, "Header"]]]
     style: Optional[str]
     explode: bool = False  # TODO True when style=form
     # TODO
@@ -194,9 +196,9 @@ class MediaType(BaseModel):
             "schema_": {"alias": "schema"}
         }
 
-    schema_: Optional[Union[Schema, Reference]]
+    schema_: Optional[SchemaOrRef]
     example: Any
-    examples: Optional[Dict[str, Union[Example, Reference]]]
+    examples: Optional[Dict[str, Union[Reference, Example]]]
     encoding: Optional[Dict[str, Encoding]]
 
     @root_validator
@@ -265,9 +267,9 @@ class Header(BaseModel):
     style: Optional[Style]
     explode: bool = False
     allowReserved: bool = False
-    schema_: Optional[Union[Schema, Reference]]
+    schema_: Optional[SchemaOrRef]
     example: Any  # TODO: Optional[object] ?
-    examples: Optional[Dict[str, Union[Example, Reference]]]
+    examples: Optional[Dict[str, Union[Reference, Example]]]
 
     content: Optional[Dict[str, MediaType]]
 
@@ -320,9 +322,9 @@ class Parameter(BaseModel):
     style: Optional[Style]
     explode: bool = False
     allowReserved: bool = False
-    schema_: Optional[Union[Schema, Reference]]
+    schema_: Optional[SchemaOrRef]
     example: Any
-    examples: Optional[Dict[str, Union[Example, Reference]]]
+    examples: Optional[Dict[str, Union[Reference, Example]]]
 
     content: Optional[Dict[str, MediaType]]
 
@@ -394,15 +396,15 @@ class Link(BaseModel):
 
 class Response(BaseModel):
     description: Optional[str]
-    headers: Optional[Dict[str, Union[Header, Reference]]]
+    headers: Optional[Dict[str, Union[Reference, Header]]]
     content: Optional[Dict[str, MediaType]]
-    links: Optional[Dict[str, Union[Link, Reference]]]
+    links: Optional[Dict[str, Union[Reference, Link]]]
 
 
 HTTP_STATUS_RE = re.compile(r"^[1-5][X0-9]{2}|default$")
 
 
-Responses = Dict[str, Union[Response, Reference]]
+Responses = Dict[str, Union[Reference, Response]]
 
 
 def check_responses(val):
@@ -426,10 +428,10 @@ class Operation(BaseModel):
     description: Optional[str]
     externalDocs: Optional[ExternalDocumentation]
     operationId: Optional[str]
-    parameters: Optional[List[Union[Parameter, Reference]]]  # TODO: unique
-    requestBody: Optional[Union[RequestBody, Reference]]
+    parameters: Optional[List[Union[Reference, Parameter]]]  # TODO: unique
+    requestBody: Optional[Union[Reference, RequestBody]]
     responses: Responses
-    callbacks: Optional[Dict[str, Union[Callback, Reference]]]
+    callbacks: Optional[Dict[str, Union[Reference, Callback]]]
     deprecated: bool = False
     security: Optional[List[SecurityRequirement]]
     servers: Optional[List[Server]]
@@ -541,15 +543,15 @@ SecurityScheme = Union[
 
 
 class Components(BaseModel):
-    schemas: Optional[Dict[str, Union[Schema, Reference]]]
-    responses: Optional[Dict[str, Union[Response, Reference]]]
-    parameters: Optional[Dict[str, Union[Parameter, Reference]]]
-    examples: Optional[Dict[str, Union[Example, Reference]]]
-    requestBodies: Optional[Dict[str, Union[RequestBody, Reference]]]
-    headers: Optional[Dict[str, Union[Header, Reference]]]
-    securitySchemes: Optional[Dict[str, Union[SecurityScheme, Reference]]]
-    links: Optional[Dict[str, Union[Link, Reference]]]
-    callbacks: Optional[Dict[str, Union[Callback, Reference]]]
+    schemas: Optional[Dict[str, SchemaOrRef]]
+    responses: Optional[Dict[str, Union[Reference, Response]]]
+    parameters: Optional[Dict[str, Union[Reference, Parameter]]]
+    examples: Optional[Dict[str, Union[Reference, Example]]]
+    requestBodies: Optional[Dict[str, Union[Reference, RequestBody]]]
+    headers: Optional[Dict[str, Union[Reference, Header]]]
+    securitySchemes: Optional[Dict[str, Union[Reference, SecurityScheme]]]
+    links: Optional[Dict[str, Union[Reference, Link]]]
+    callbacks: Optional[Dict[str, Union[Reference, Callback]]]
 
 
 class Tag(BaseModel):

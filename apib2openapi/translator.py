@@ -1,24 +1,12 @@
-"""
-openapi: 3.0.0
-info:
-  title: Sample API
-  description: Optional multiline or single-line description in [CommonMark](http://commonmark.org/help/) or HTML.
-  version: 0.1.9
-servers:
-  - url: http://api.example.com/v1
-    description: Optional server description, e.g. Main (production) server
-  - url: http://staging-api.example.com
-    description: Optional server description, e.g. Internal staging server for testing
-paths:
-  /pets:
-    get:
-      summary: List all pets
-      operationId: listPets
-      tags:
-        - pets
-"""
+import yaml
 
-OPEN_API_VERSION = '3.0.0'
+from apib2openapi.models import OpenAPI3Document
+
+
+def dump(doc: OpenAPI3Document, path: str):
+    serialized = doc.dict(by_alias=True, exclude_unset=True)
+    with open(path, "w+") as f:
+        yaml.dump(serialized, f, default_flow_style=False, sort_keys=False)
 
 
 def metadata_value(bp, key):
