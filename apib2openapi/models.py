@@ -125,23 +125,23 @@ class Schema(BaseModel):
     deprecated: bool = False
 
     @validator("required")
-    def check_required(self, v):
+    def check_required(cls, v):
         assert len(v) > 0, "`required` must be non-empty if present"
         return v
 
     @validator("enum")
-    def check_enum(self, v):
+    def check_enum(cls, v):
         assert len(v) > 0, "`enum` must be non-empty if present"
         return v
 
     @root_validator
-    def check_items(self, values):
+    def check_items(cls, values):
         if values.get("type") == "array":
             assert values.get("items"), "`items` must be present when `type='array'`"
         return values
 
     @root_validator
-    def check_discriminator(self, values):
+    def check_discriminator(cls, values):
         # The discriminator object is legal only when using one of the composite keywords oneOf, anyOf, allOf.
         if not any(key in values for key in {"oneOf", "anyOf", "allOf"}):
             raise ValueError(
@@ -182,7 +182,12 @@ class Encoding(BaseModel):
 
 
 class MediaType(BaseModel):
-    schema: Optional[Union[Schema, Reference]]
+    class Config:
+        fields = {
+            "schema_": {"alias": "schema"}
+        }
+
+    schema_: Optional[Union[Schema, Reference]]
     example: Any
     examples: Optional[Dict[str, Union[Example, Reference]]]
     encoding: Optional[Dict[str, Encoding]]
@@ -240,6 +245,11 @@ IN_STYLE_DEFAULTS = {
 
 
 class Header(BaseModel):
+    class Config:
+        fields = {
+            "schema_": {"alias": "schema"}
+        }
+
     description: Optional[str]
     required: bool = False
     deprecated: bool = False
@@ -248,7 +258,7 @@ class Header(BaseModel):
     style: Optional[Style]
     explode: bool = False
     allowReserved: bool = False
-    schema: Optional[Union[Schema, Reference]]
+    schema_: Optional[Union[Schema, Reference]]
     example: Any  # TODO: Optional[object] ?
     examples: Optional[Dict[str, Union[Example, Reference]]]
 
@@ -288,6 +298,11 @@ class Header(BaseModel):
 
 
 class Parameter(BaseModel):
+    class Config:
+        fields = {
+            "schema_": {"alias": "schema"}
+        }
+
     name: str
     in_: In = Field(..., alias="in")
     description: Optional[str]
@@ -298,7 +313,7 @@ class Parameter(BaseModel):
     style: Optional[Style]
     explode: bool = False
     allowReserved: bool = False
-    schema: Optional[Union[Schema, Reference]]
+    schema_: Optional[Union[Schema, Reference]]
     example: Any
     examples: Optional[Dict[str, Union[Example, Reference]]]
 
