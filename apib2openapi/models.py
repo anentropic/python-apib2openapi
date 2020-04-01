@@ -35,7 +35,7 @@ class Contact(BaseModel):
 
 class License(BaseModel):
     name: str
-    url: HttpUrl
+    url: Optional[HttpUrl]
 
 
 class Info(BaseModel):
@@ -81,6 +81,13 @@ SchemaOrRef = Union["Schema", "Reference"]
 
 
 class Schema(BaseModel):
+    """
+    This class is a combination of JSON Schema rules:
+    https://tools.ietf.org/html/draft-wright-json-schema-validation-00
+
+    With some overrides and extra fields as defined by Open API here:
+    https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md#schemaObject
+    """
     class Config:
         # hopefully this allows these fields to remain unset?
         fields = {
@@ -93,7 +100,7 @@ class Schema(BaseModel):
     multipleOf: Optional[PositiveInt]
     maximum: Optional[float]
     exclusiveMaximum: bool = False
-    minimum: float
+    minimum: Optional[float]
     exclusiveMinimum: bool = False
     maxLength: Optional[PositiveInt]
     minLength: Optional[conint(ge=0)]
@@ -103,8 +110,8 @@ class Schema(BaseModel):
     uniqueItems: bool = False
     maxProperties: Optional[conint(ge=0)]
     minProperties: Optional[conint(ge=0)]
-    required: Optional[Set[str]]
-    enum: Optional[Set[Any]]
+    required: Optional[List[str]]  # TODO unique
+    enum: Optional[List[Any]]  # TODO unique
 
     type_: Optional[str]
     allOf: Optional[List[SchemaOrRef]]
@@ -395,25 +402,22 @@ class Response(BaseModel):
 HTTP_STATUS_RE = re.compile(r"^[1-5][X0-9]{2}|default$")
 
 
-class Responses(BaseModel):
-    __root__: Dict[str, Union[Response, Reference]]
-
-    @root_validator
-    def check_http_status(cls, values):
-        for key in values:
-            if not HTTP_STATUS_RE.match(key):
-                raise ValueError(f"{key} is not a valid Response key")
-        return values
+Responses = Dict[str, Union[Response, Reference]]
 
 
-class Callback(BaseModel):
-    __root__: Dict[str, 'PathItem']
+def check_responses(val):
+    for key in val:
+        if not HTTP_STATUS_RE.match(key):
+            raise ValueError(f"{key} is not a valid Response key")
+    return val
 
 
-class SecurityRequirement(BaseModel):
-    __root__: Dict[str, List[str]]
-    # Each name MUST correspond to a security scheme which is declared in the
-    # Security Schemes under the Components Object. (TODO)
+Callback = Dict[str, 'PathItem']
+
+
+SecurityRequirement = Dict[str, List[str]]
+# Each name MUST correspond to a security scheme which is declared in the
+# Security Schemes under the Components Object. (TODO)
 
 
 class Operation(BaseModel):
@@ -422,7 +426,7 @@ class Operation(BaseModel):
     description: Optional[str]
     externalDocs: Optional[ExternalDocumentation]
     operationId: Optional[str]
-    parameters: Optional[Set[Union[Parameter, Reference]]]
+    parameters: Optional[List[Union[Parameter, Reference]]]  # TODO: unique
     requestBody: Optional[Union[RequestBody, Reference]]
     responses: Responses
     callbacks: Optional[Dict[str, Union[Callback, Reference]]]
@@ -430,9 +434,16 @@ class Operation(BaseModel):
     security: Optional[List[SecurityRequirement]]
     servers: Optional[List[Server]]
 
+    _check_responses = validator("responses", allow_reuse=True)(check_responses)
+
 
 class PathItem(BaseModel):
-    ref: Optional[str] = Field(..., alias="$ref")
+    class Config:
+        fields = {
+            "ref": {"alias": "$ref"}
+        }
+
+    ref: Optional[str]
     summary: Optional[str]
     description: Optional[str]
     get: Optional[Operation]
@@ -445,8 +456,7 @@ class PathItem(BaseModel):
     trace: Optional[Operation]
 
 
-class Paths(BaseModel):
-    __root__: Dict[str, PathItem]
+Paths = Dict[str, PathItem]
 
 
 class _BaseOAuthFlow(BaseModel):
@@ -549,7 +559,11 @@ class Tag(BaseModel):
 
 
 class OpenAPI3Document(BaseModel):
-    openapi: constr(regex=r'\d+\.\d+\.\d+') = "3.0.0"
+    """
+    See:
+    https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md
+    """
+    openapi: constr(regex=r'\d+\.\d+\.\d+') = "3.0.2"
     info: Info
     servers: List[Server] = [Server(url="/")]
     paths: Paths
