@@ -23,6 +23,8 @@ pyyaml = "^5.3.1"
 pytest = "^4.6"
 ipython = "^7.13.0"
 pytype = {version = "^2020.4.1", python = ">=3.6,<3.8"}
+hypothesis = "^5.8.0"
+hypothesis-jsonschema = "^0.11.1"
 
 [build-system]
 requires = ["poetry>=0.12"]
