@@ -1,6 +1,6 @@
 import re
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import (
     BaseModel as PydanticBaseModel,
@@ -19,11 +19,24 @@ from pydantic import (
 # TODO: support extensions
 
 
+def check_unique(val: List[Any]):
+    """
+    We can't do the `len(set(val))` trick because `val` may not
+    be hashable...
+    """
+    seen = []
+    for item in val:
+        if item in seen:
+            raise ValueError(f"values in list must be unique")
+        seen.append(val)
+    return val
+
+
 class BaseModel(PydanticBaseModel):
     class Config:
         use_enum_values = True
         allow_mutation = False
-        # TODO: auto CamelCase?
+        # TODO: auto CamelCase aliasing?
 
 
 class Contact(BaseModel):
@@ -47,9 +60,11 @@ class Info(BaseModel):
 
 
 class ServerVariable(BaseModel):
-    enum: Optional[Set[str]]  # TODO: StrEnum?
+    enum: Optional[List[str]]
     default: str
     description: Optional[str]
+
+    _check_enum = validator("enum", allow_reuse=True)(check_unique)
 
 
 class Server(BaseModel):
@@ -112,8 +127,8 @@ class Schema(BaseModel):
     uniqueItems: bool = False
     maxProperties: Optional[conint(ge=0)]
     minProperties: Optional[conint(ge=0)]
-    required: Optional[List[str]]  # TODO unique
-    enum: Optional[List[Any]]  # TODO unique
+    required: Optional[List[str]]
+    enum: Optional[List[Any]]
 
     type_: Optional[str]
     allOf: Optional[List[SchemaOrRef]]
@@ -132,6 +147,8 @@ class Schema(BaseModel):
     externalDocs: Optional[ExternalDocumentation]
     example: Any
     deprecated: bool = False
+
+    _check_uniques = validator("required", "enum", allow_reuse=True)(check_unique)
 
     @validator("required")
     def check_required(cls, v):
@@ -186,8 +203,14 @@ class Encoding(BaseModel):
     contentType: Optional[str]
     headers: Optional[Dict[str, Union[Reference, "Header"]]]
     style: Optional[str]
-    explode: bool = False  # TODO True when style=form
-    # TODO
+    explode: bool = False
+    allowReserved: bool = False
+
+    @root_validator
+    def default_explode(cls, values):
+        if "explode" not in values and values.get("style") is Style.FORM:
+            values['explode'] = True
+        return values
 
 
 class MediaType(BaseModel):
@@ -203,6 +226,10 @@ class MediaType(BaseModel):
 
     @root_validator
     def check_examples(cls, values):
+        """
+        In OpenAPI v3.1 the Schema Object example keyword is deprecated, so you
+        should start using examples in your API description documents.
+        """
         if values.get("example") and values.get("examples"):
             raise ValueError("`example` and `examples` are mutually-exclusive")
         return values
@@ -268,7 +295,7 @@ class Header(BaseModel):
     explode: bool = False
     allowReserved: bool = False
     schema_: Optional[SchemaOrRef]
-    example: Any  # TODO: Optional[object] ?
+    example: Any
     examples: Optional[Dict[str, Union[Reference, Example]]]
 
     content: Optional[Dict[str, MediaType]]
@@ -296,6 +323,10 @@ class Header(BaseModel):
 
     @root_validator
     def check_examples(cls, values):
+        """
+        In OpenAPI v3.1 the Schema Object example keyword is deprecated, so you
+        should start using examples in your API description documents.
+        """
         if values.get("example") and values.get("examples"):
             raise ValueError("`example` and `examples` are mutually-exclusive")
         return values
@@ -361,6 +392,10 @@ class Parameter(BaseModel):
 
     @root_validator
     def check_examples(cls, values):
+        """
+        In OpenAPI v3.1 the Schema Object example keyword is deprecated, so you
+        should start using examples in your API description documents.
+        """
         if values.get("example") and values.get("examples"):
             raise ValueError("`example` and `examples` are mutually-exclusive")
         return values
@@ -428,7 +463,7 @@ class Operation(BaseModel):
     description: Optional[str]
     externalDocs: Optional[ExternalDocumentation]
     operationId: Optional[str]
-    parameters: Optional[List[Union[Reference, Parameter]]]  # TODO: unique
+    parameters: Optional[List[Union[Reference, Parameter]]]
     requestBody: Optional[Union[Reference, RequestBody]]
     responses: Responses
     callbacks: Optional[Dict[str, Union[Reference, Callback]]]
@@ -436,6 +471,7 @@ class Operation(BaseModel):
     security: Optional[List[SecurityRequirement]]
     servers: Optional[List[Server]]
 
+    _check_parameters = validator("parameters", allow_reuse=True)(check_unique)
     _check_responses = validator("responses", allow_reuse=True)(check_responses)
 
 
